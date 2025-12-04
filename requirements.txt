@@ -1,3 +1,3 @@
 python-telegram-bot==20.6
-jdatetime==4.3.0
+jdatetime
 psycopg2-binary==2.9.7
