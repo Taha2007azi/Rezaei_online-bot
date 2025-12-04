@@ -3,6 +3,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Conv
 import jdatetime
 import psycopg2
 import os
+from urllib.parse import urlparse
 
 # وضعیت‌های مکالمه
 NAME, PHONE, AGE, ISSUE, PSYCH, DATE, TIME = range(7)
@@ -11,13 +12,16 @@ NAME, PHONE, AGE, ISSUE, PSYCH, DATE, TIME = range(7)
 TOKEN = os.getenv('TOKEN')
 ADMIN_CHAT_ID = 7548579249
 
-# اتصال به PostgreSQL
+# --- اتصال به PostgreSQL با DATABASE_URL ---
+DATABASE_URL = os.getenv("DATABASE_URL") or "postgresql://postgres:dSyLEmnDgGChdXJzygbTMGLNhFYcshtX@interchange.proxy.rlwy.net:52387/railway"
+url = urlparse(DATABASE_URL)
+
 conn = psycopg2.connect(
-    host=os.getenv('PGHOST'),            # RAILWAY_PRIVATE_DOMAIN
-    database=os.getenv('POSTGRES_DB'),   # PGDATABASE یا POSTGRES_DB
-    user=os.getenv('POSTGRES_USER'),     # PGUSER یا POSTGRES_USER
-    password=os.getenv('POSTGRES_PASSWORD'),  # PGPASSWORD
-    port=os.getenv('PGPORT', 5432)
+    dbname=url.path[1:],   # اسم دیتابیس
+    user=url.username,     # یوزر
+    password=url.password, # پسورد
+    host=url.hostname,     # هاست
+    port=url.port          # پورت
 )
 c = conn.cursor()
 
@@ -40,7 +44,7 @@ conn.commit()
 
 # ساعات کاری روانشناسان
 PSYCHS = {
-    "دکتر محمدی": {
+    "دکتر رضائی": {
         "شنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"],
         "یکشنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"],
         "دوشنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00"],
@@ -149,6 +153,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("عملیات لغو شد.")
     return ConversationHandler.END
 
+# --- Main ---
 def main():
     app = Application.builder().token(TOKEN).build()
     conv_handler = ConversationHandler(
