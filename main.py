@@ -12,7 +12,7 @@ NAME, PHONE, AGE, ISSUE, PSYCH, DATE, TIME = range(7)
 TOKEN = os.getenv('TOKEN')
 
 # آیدی ادمین (پیام رزرو جدید به این آیدی ارسال می‌شود)
-ADMIN_CHAT_ID = 123456789  # این را با آیدی خودت عوض کن
+ADMIN_CHAT_ID = 7548579249  # این را با آیدی خودت عوض کن
 
 # اتصال به دیتابیس
 conn = sqlite3.connect('appointments.db', check_same_thread=False)
