@@ -177,13 +177,13 @@ def main():
         entry_points=[CommandHandler('start', start),
                       MessageHandler(filters.TEXT & ~filters.COMMAND, cancel_appointment)],
         states={
-            PSYCH: [CallbackQueryHandler(psych_chosen)],
+            PSYCH: [CallbackQueryHandler(psych_chosen, pattern="^psych_")],
             NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, name_received)],
             PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, phone_received)],
             AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, age_received)],
             ISSUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, issue_received)],
-            DATE: [CallbackQueryHandler(date_chosen)],    # حتماً باشه
-            TIME: [CallbackQueryHandler(time_chosen)],    # حتماً باشه
+            DATE: [CallbackQueryHandler(date_chosen, pattern="^date_")],
+            TIME: [CallbackQueryHandler(time_chosen, pattern="^time_")],
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
