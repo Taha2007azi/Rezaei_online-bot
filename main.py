@@ -2,12 +2,12 @@ from telegram import Update, ReplyKeyboardMarkup, ForceReply
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters, ContextTypes
 import jdatetime
 import sqlite3
-import os
 
 # وضعیت‌های مکالمه
 START_MENU, PSYCH, NAME, PHONE, AGE, ISSUE, DATE, TIME = range(8)
 
-TOKEN = os.getenv('TOKEN')
+# توکن بات جدیدت
+TOKEN = "8393293993:AAHGYfvitBlcYxTwtvQjNT0Epo3PUNXx25k"
 ADMIN_CHAT_ID = 7548579249
 
 # اتصال به دیتابیس
