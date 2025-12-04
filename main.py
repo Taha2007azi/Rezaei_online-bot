@@ -1,46 +1,38 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application, CommandHandler, CallbackQueryHandler,
-    ConversationHandler, MessageHandler, filters, ContextTypes
-)
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters, ContextTypes
 import jdatetime
 import sqlite3
 import os
 
-# وضعیت‌ها
 (NAME, PHONE, AGE, ISSUE, PSYCH, DATE, TIME) = range(7)
-
 TOKEN = os.getenv('TOKEN')
-ADMIN_USERNAME = "@Taha2007azi"
+ADMIN = "@Taha2007azi"
 
-# دیتابیس
 conn = sqlite3.connect('appointments.db', check_same_thread=False)
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS appointments
-             (id INTEGER PRIMARY KEY, name TEXT, phone TEXT, age INTEGER, issue TEXT,
-              psych TEXT, date TEXT, time TEXT, link TEXT, paid INTEGER, code TEXT)''')
+             (name TEXT, phone TEXT, age TEXT, issue TEXT, psych TEXT, date TEXT, time TEXT, code TEXT)''')
 conn.commit()
 
-# روانشناس‌ها
 PSYCHS = {"دکتر محمدی": {
-    "شنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"],
-    "یکشنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"],
-    "دوشنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00"],
-    "سه‌شنبه": ["10:00", "11:00", "14:00", "15:00", "16:00"],
-    "چهارشنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"]
+    "شنبه": ["10:00","11:00","14:00","15:00","16:00","17:00","18:00"],
+    "یکشنبه": ["10:00","11:00","14:00","15:00","16:00","17:00","18:00"],
+    "دوشنبه": ["10:00","11:00","14:00","15:00","16:00","17:00"],
+    "سه‌شنبه": ["10:00","11:00","14:00","15:00","16:00"],
+    "چهارشنبه": ["10:00","11:00","14:00","15:00","16:00","17:00","18:00"]
 }}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton(p, callback_data=f"psych_{p}")] for p in PSYCHS]
-    await update.message.reply_text("سلام! به بات رزرو نوبت خوش آمدید 🌸\nروانشناس رو انتخاب کنید:", reply_markup=InlineKeyboardMarkup(keyboard))
+    kb = [[InlineKeyboardButton(p, callback_data=f"psych:{p}")] for p in PSYCHS]
+    await update.message.reply_text("سلام 🌸\nروانشناس رو انتخاب کن:", reply_markup=InlineKeyboardMarkup(kb))
     return PSYCH
 
 async def psych_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    psych = query.data.replace("psych_", "")
+    q = update.callback_query
+    await q.answer()
+    psych = q.data.split(":")[1]
     context.user_data["psych"] = psych
-    await query.edit_message_text(f"روانشناس: {psych}\n\nاسم و فامیلتون؟")
+    await q.edit_message_text(f"روانشناس: {psych}\n\nاسم و فامیل؟")
     return NAME
 
 async def name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -55,92 +47,87 @@ async def phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def age_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["age"] = update.message.text
-    await update.message.reply_text("موضوع جلسه؟ (مثلاً اضطراب، رابطه و...)")
+    await update.message.reply_text("موضوع جلسه؟")
     return ISSUE
 
 async def issue_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["issue"] = update.message.text
     today = jdatetime.date.today()
     dates = []
-    for i in range(14):
-        day = today + jdatetime.timedelta(days=i)
-        if day.weekday() < 5:
-            persian_day = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه"][day.weekday()]
-            dates.append((day.strftime("%Y/%m/%d"), f"{persian_day} {day.strftime('%Y/%m/%d')}"))
-    keyboard = [[InlineKeyboardButton(text, callback_data=f"date_{d}")] for d, text in dates]
-    await update.message.reply_text("روز رو انتخاب کنید:", reply_markup=InlineKeyboardMarkup(keyboard))
+    for i in range(15):
+        d = today + jdatetime.timedelta(days=i)
+        if d.weekday() < 5:
+            wd = ["شنبه","یکشنبه","دوشنبه","سه‌شنبه","چهارشنبه","پنج‌شنبه","جمعه"][d.weekday()]
+            dates.append((d.strftime("%Y/%m/%d"), f"{wd} {d.strftime('%Y/%m/%d')}"))
+    kb = [[InlineKeyboardButton(t, callback_data=f"date:{d}")] for d, t in dates]
+    await update.message.reply_text("روز رو انتخاب کن:", reply_markup=InlineKeyboardMarkup(kb))
     return DATE
 
 async def date_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    date = query.data.replace("date_", "")
+    q = update.callback_query
+    await q.answer()
+    date = q.data.split(":")[1]
     context.user_data["date"] = date
     jalali = jdatetime.date.fromstring(date)
-    weekday = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه"][jalali.weekday()]
-    psych = context.user_data["psych"]
-    times = PSYCHS[psych].get(weekday, [])
-    c.execute("SELECT time FROM appointments WHERE date=? AND psych=?", (date, psych))
-    booked = [row[0] for row in c.fetchall()]
+    wd = ["شنبه","یکشنبه","دوشنبه","سه‌شنبه","چهارشنبه","پنج‌شنبه","جمعه"][jalali.weekday()]
+    times = PSYCHS[context.user_data["psych"]].get(wd, [])
+    c.execute("SELECT time FROM appointments WHERE date=? AND psych=?", (date, context.user_data["psych"]))
+    booked = [r[0] for r in c.fetchall()]
     free = [t for t in times if t not in booked]
     if not free:
-        await query.edit_message_text("این روز پره! دوباره /start بزنید.")
+        await q.edit_message_text("این روز پره!\n/start بزن دوباره")
         return ConversationHandler.END
-    keyboard = [[InlineKeyboardButton(t, callback_data=f"time_{t}")] for t in free]
-    await query.edit_message_text(f"ساعت‌های آزاد {weekday} {date}:\nانتخاب کنید:", reply_markup=InlineKeyboardMarkup(keyboard))
+    kb = [[InlineKeyboardButton(t, callback_data=f"time:{t}")] for t in free]
+    await q.edit_message_text(f"ساعت آزاد {wd} {date}:", reply_markup=InlineKeyboardMarkup(kb))
     return TIME
 
 async def time_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    time = query.data.replace("time_", "")
-    context.user_data["time"] = time
-    user = context.user_data
-    code = str(abs(hash(user["name"] + time + user["date"])))[:6]
-    c.execute("INSERT INTO appointments (name,phone,age,issue,psych,date,time,link,paid,code) VALUES (?,?,?,?,?,?,?,?,0,?)",
-              (user["name"], user["phone"], user["age"], user["issue"], user["psych"], user["date"], time, "https://meet.google.com/new", code))
+    q = update.callback_query
+    await q.answer()
+    time = q.data.split(":")[1]
+    u = context.user_data
+    code = str(abs(hash(u["name"]+time+u["date"])))[:6]
+    c.execute("INSERT INTO appointments VALUES (?,?,?,?,?,?,?,?)",
+              (u["name"], u["phone"], u["age"], u["issue"], u["psych"], u["date"], time, code))
     conn.commit()
-    await query.edit_message_text(
-        f"نوبت ثبت شد! ✅\n\nروانشناس: {user['psych']}\nروز: {user['date']} ساعت {time}\nلینک: https://meet.google.com/new\n\nکد لغو: `{code}`\n(فقط این کد رو برام بفرستید برای لغو)",
+    await q.edit_message_text(
+        f"نوبت ثبت شد ✅\n\n{u['psych']}\n{u['date']} ساعت {time}\nلینک: https://meet.google.com/new\n\nکد لغو: `{code}`",
         parse_mode="Markdown"
     )
-    # نوتیف به تو
     try:
-        await context.bot.send_message(ADMIN_USERNAME,
-            f"نوبت جدید!\nنام: {user['name']}\nتلفن: {user['phone']}\nسن: {user['age']}\nموضوع: {user['issue']}\nروانشناس: {user['psych']}\n{user['date']} ساعت {time}\nکد لغو: {code}")
+        await context.bot.send_message(ADMIN, f"نوبت جدید!\n{u['name']} - {u['phone']}\n{u['psych']} | {u['date']} | {time}\nکد: {code}")
     except: pass
     return ConversationHandler.END
 
 async def cancel_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     code = update.message.text.strip()
     c.execute("SELECT * FROM appointments WHERE code=?", (code,))
-    row = c.fetchone()
-    if row and row[9] == 0:
+    r = c.fetchone()
+    if r:
         c.execute("DELETE FROM appointments WHERE code=?", (code,))
         conn.commit()
-        await update.message.reply_text(f"نوبت با کد {code} لغو شد ✅")
-        await context.bot.send_message(ADMIN_USERNAME, f"لغو شد!\nنام: {row[1]}\n{row[6]} ساعت {row[7]}")
+        await update.message.reply_text("نوبت لغو شد ✅")
+        await context.bot.send_message(ADMIN, f"لغو شد:\n{r[0]} | {r[5]} | {r[6]}")
     else:
-        await update.message.reply_text("کد اشتباه یا قبلاً لغو شده.")
+        await update.message.reply_text("کد پیدا نشد.")
     return ConversationHandler.END
 
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(ConversationHandler(
-        entry_points=[CommandHandler("start", start),
-                      MessageHandler(filters.TEXT & ~filters.COMMAND, cancel_appointment)],
+        entry_points=[CommandHandler("start", start), MessageHandler(filters.TEXT & ~filters.COMMAND, cancel_appointment)],
         states={
-            PSYCH: [CallbackQueryHandler(psych_chosen, pattern="^psych_")],
-            NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, name_received)],
-            PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, phone_received)],
-            AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, age_received)],
-            ISSUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, issue_received)],
-            DATE: [CallbackQueryHandler(date_chosen, pattern="^date_")],
-            TIME: [CallbackQueryHandler(time_chosen, pattern="^time_")],
+            PSYCH: [CallbackQueryHandler(psych_chosen, pattern=r"^psych:.+")],
+            NAME:   [MessageHandler(filters.TEXT & ~filters.COMMAND, name_received)],
+            PHONE:  [MessageHandler(filters.TEXT & ~filters.COMMAND, phone_received)],
+            AGE:    [MessageHandler(filters.TEXT & ~filters.COMMAND, age_received)],
+            ISSUE:  [MessageHandler(filters.TEXT & ~filters.COMMAND, issue_received)],
+            DATE:   [CallbackQueryHandler(date_chosen, pattern=r"^date:.+")],
+            TIME:   [CallbackQueryHandler(time_chosen, pattern=r"^time:.+")],
         },
-        fallbacks=[CommandHandler("cancel", lambda u,c: ConversationHandler.END)]
+        fallbacks=[]
     ))
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
