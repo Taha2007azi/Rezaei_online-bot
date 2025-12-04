@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import sqlite3
 import os
 import os
+ADMIN_ID = 777000123  # بعداً عوضش می‌کنیم با آیدی عددی تو
 
 # وضعیت‌های مکالمه
 NAME, PHONE, AGE, ISSUE, PSYCH, DATE, TIME = range(7)
@@ -131,7 +132,20 @@ async def time_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     # اینجا لینک پرداخت زرین‌پال می‌فرستیم (بعداً اضافه می‌کنم)
-    
+    # ارسال نوتیف به ادمین (خودت)
+    try:
+        await context.bot.send_message(
+            chat_id="@Taha2007azi",  # یوزرنیم تو
+            text=f"نوبت جدید!\n\n"
+                 f"نام: {user['name']}\n"
+                 f"تلفن: {user['phone']}\n"
+                 f"سن: {user['age']}\n"
+                 f"موضوع: {user['issue']}\n"
+                 f"روانشناس: {user['psych']}\n"
+                 f"روز: {user['date']} ساعت {user['time']}"
+        )
+    except:
+        pass  # اگه آفلاین باشی خطا نده
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
