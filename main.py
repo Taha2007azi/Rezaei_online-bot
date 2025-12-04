@@ -1,5 +1,8 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (
+    Application, CommandHandler, CallbackQueryHandler,
+    ConversationHandler, MessageHandler, filters, ContextTypes
+)
 import jdatetime
 import sqlite3
 import os
@@ -8,25 +11,27 @@ import os
 NAME, PHONE, AGE, ISSUE, PSYCH, DATE, TIME = range(7)
 
 TOKEN = os.getenv('TOKEN')
-ADMIN_USERNAME = "@Taha2007azi"  # یوزرنیم تو
+ADMIN_USERNAME = "@Taha2007azi"  # تو
 
 # دیتابیس
 conn = sqlite3.connect('appointments.db', check_same_thread=False)
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS appointments
-             (id INTEGER PRIMARY KEY, name TEXT, phone TEXT, age INTEGER, issue TEXT, psych TEXT, date TEXT, time TEXT, link TEXT, paid INTEGER, code TEXT)''')
+             (id INTEGER PRIMARY KEY, name TEXT, phone TEXT, age INTEGER, issue TEXT,
+              psych TEXT, date TEXT, time TEXT, link TEXT, paid INTEGER, code TEXT)''')
 conn.commit()
 
-# روانشناس‌ها
+# روانشناس‌ها و ساعت‌ها
 PSYCHS = {
-    "دکتر محمدی": {"شنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"],
-                  "یکشنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"],
-                  "دوشنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00"],
-                  "سه‌شنبه": ["10:00", "11:00", "14:00", "15:00", "16:00"],
-                  "چهارشنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"]}
+    "دکتر محمدی": {
+        "شنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"],
+        "یکشنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"],
+        "دوشنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00"],
+        "سه‌شنبه": ["10:00", "11:00", "14:00", "15:00", "16:00"],
+        "چهارشنبه": ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"]
+    }
 }
 
-# شروع
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton(psych, callback_data=f"psych_{psych}")] for psych in PSYCHS.keys()]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -61,12 +66,11 @@ async def age_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def issue_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['issue'] = update.message.text
-    
     today = jdatetime.date.today()
     dates = []
     for i in range(14):
         day = today + jdatetime.timedelta(days=i)
-        if day.weekday() < 5:
+        if day.weekday() < 5:  # شنبه تا چهارشنبه
             persian_day = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه"][day.weekday()]
             dates.append((day.strftime("%Y/%m/%d"), f"{persian_day} {day.strftime('%Y/%m/%d')}"))
     
@@ -107,12 +111,12 @@ async def time_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user = context.user_data
     link = "https://meet.google.com/new"
-    cancel_code = str(abs(hash(f"{user['name']}{selected_time}{user['date']}")))[:6]  # کد ۶ رقمی
+    cancel_code = str(abs(hash(f"{user['name']}{selected_time}{user['date']}")))[:6]
 
     c.execute("""INSERT INTO appointments 
                  (name, phone, age, issue, psych, date, time, link, paid, code) 
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)""",
-              (user['name'], user['phone'], user['age'], user['issue'], user['psych'], 
+              (user['name'], user['phone'], user['age'], user['issue'], user['psych'],
                user['date'], selected_time, link, cancel_code))
     conn.commit()
     
@@ -126,7 +130,7 @@ async def time_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='Markdown'
     )
     
-    # نوتیف به تو
+    # نوتیف فوری به تو
     try:
         await context.bot.send_message(
             chat_id=ADMIN_USERNAME,
@@ -140,34 +144,26 @@ async def time_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
                  f"کد لغو: {cancel_code}"
         )
     except Exception as e:
-        print("خطا در نوتیف:", e)
+        print("خطا در ارسال نوتیف:", e)
     
     return ConversationHandler.END
 
-# لغو نوبت با ارسال کد
+# لغو نوبت
 async def cancel_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     code = update.message.text.strip()
     c.execute("SELECT * FROM appointments WHERE code = ?", (code,))
     apt = c.fetchone()
     
-    if apt and apt[9] == 0:  # paid == 0
+    if apt and apt[9] == 0:
         c.execute("DELETE FROM appointments WHERE code = ?", (code,))
         conn.commit()
         await update.message.reply_text(f"نوبت با کد `{code}` با موفقیت لغو شد ✅", parse_mode='Markdown')
-        
-        # اطلاع به ادمین
         await context.bot.send_message(
             chat_id=ADMIN_USERNAME,
-            text=f"لغو نوبت!\n\n"
-                 f"نام: {apt[1]}\n"
-                 f"تلفن: {apt[2]}\n"
-                 f"روانشناس: {apt[5]}\n"
-                 f"روز: {apt[6]} ساعت {apt[7]}\n"
-                 f"توسط کاربر لغو شد."
+            text=f"لغو نوبت!\n\nنام: {apt[1]}\nتلفن: {apt[2]}\nروانشناس: {apt[5]}\nروز: {apt[6]} ساعت {apt[7]}"
         )
     else:
-        await update.message.reply_text("کد اشتباه است یا نوبت قبلاً لغو/پرداخت شده.")
-    
+        await update.message.reply_text("کد اشتباه است یا نوبت قبلاً لغو شده.")
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -179,15 +175,15 @@ def main():
     
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start),
-                      MessageHandler(filters.TEXT & ~filters.COMMAND, cancel_appointment)],  # هر متنی می‌تونه کد لغو باشه
+                      MessageHandler(filters.TEXT & ~filters.COMMAND, cancel_appointment)],
         states={
             PSYCH: [CallbackQueryHandler(psych_chosen)],
             NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, name_received)],
             PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, phone_received)],
             AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, age_received)],
             ISSUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, issue_received)],
-            DATE: [CallbackQueryHandler(date_chosen)],
-            TIME: [CallbackQueryHandler(time_chosen)],
+            DATE: [CallbackQueryHandler(date_chosen)],    # حتماً باشه
+            TIME: [CallbackQueryHandler(time_chosen)],    # حتماً باشه
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
