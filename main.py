@@ -29,12 +29,12 @@ from telegram.ext import (
 # -------------------------
 TOKEN = os.getenv("TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "7548579249"))
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "7548579249"))  # ادمین
 
-# لینک ثابت گوگل میت (درخواست شما)
-MEET_LINK = "https://meet.google.com/new"
+# لینک ثابت گوگل میت
+MEET_LINK = "https://meet.google.com/abc-defg-hij"  # می‌تونی لینک ثابت خودت رو بذاری
 
-# ساعت‌های مجاز هر روز هفته (این قسمت قبلاً گم شده بود!)
+# ساعت‌های مجاز هر روز (به صورت لیست)
 AVAILABLE_TIMES = {
     "شنبه":     ["10:00", "11:30", "14:00", "15:30", "17:00", "18:30"],
     "یکشنبه":   ["10:00", "11:30", "14:00", "15:30", "17:00", "18:30"],
@@ -48,9 +48,9 @@ AVAILABLE_TIMES = {
 # حالت‌های مکالمه
 NAME, PHONE, AGE, ISSUE, CALENDAR, TIME = range(6)
 
-# ذخیره موقت در صورت عدم دسترسی به دیتابیس
-_memory_users = {}          # chat_id -> {name, phone, age}
-_memory_appointments = {}   # chat_id -> appointment dict
+# حافظه موقت (در صورت عدم دسترسی به دیتابیس)
+_memory_users = {}
+_memory_appointments = {}
 
 # اتصال دیتابیس
 _conn = None
@@ -148,13 +148,11 @@ def valid_age(text: str) -> bool:
 def render_month_keyboard(year: int, month: int):
     first_day = jdatetime.date(year, month, 1)
     days_in_month = jdatetime.j_days_in_month[month - 1]
-
-    # شروع هفته از شنبه
-    start_offset = (first_day.weekday() + 2) % 7  # دوشنبه=0 → شنبه=5 → offset محاسبه میشه
+    start_offset = (first_day.weekday() + 2) % 7  # شنبه = 0
 
     buttons = []
 
-    # هدر: ماه و سال + دکمه‌های قبلی/بعدی
+    # هدر ماه
     buttons.append([
         InlineKeyboardButton("◀️", callback_data=f"cal:prev:{year}:{month}"),
         InlineKeyboardButton(f"{first_day.j_months_fa[month-1]} {year}", callback_data="noop"),
@@ -171,10 +169,13 @@ def render_month_keyboard(year: int, month: int):
     for i in range(start_offset, 7):
         week[i] = day
         day += 1
-    buttons.append([InlineKeyboardButton(" " if d is None else str(d),
-                  callback_data="noop" if d is None else f"cal:day:{year}:{month:02d}:{d:02d}") for d in week])
+    buttons.append([
+        InlineKeyboardButton(" " if d is None else str(d),
+                             callback_data="noop" if d is None else f"cal:day:{year}:{month:02d}:{d:02d}")
+        for d in week
+    ])
 
-    # هفته‌های کامل
+    # هفته‌های بعدی
     while day <= days_in_month:
         week = []
         for _ in range(7):
@@ -183,10 +184,13 @@ def render_month_keyboard(year: int, month: int):
                 day += 1
             else:
                 week.append(None)
-        buttons.append([InlineKeyboardButton(" " if d is None else str(d),
-                      callback_data="noop" if d is None else f"cal:day:{year}:{month:02d}:{d:02d}") for d in week])
+        buttons.append([
+            InlineKeyboardButton(" " if d is None else str(d),
+                                 callback_data="noop" if d is None else f"cal:day:{year}:{month:02d}:{d:02d}")
+            for d in week
+        ])
 
-    # پایین صفحه
+    # دکمه‌های پایین
     buttons.append([
         InlineKeyboardButton("امروز", callback_data="cal:today"),
         InlineKeyboardButton("بستن", callback_data="cal:close"),
@@ -211,7 +215,7 @@ def main_menu():
 # هندلرها
 # -------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = "سلام! به بات رزرو مشاوره خوش آمدید\nبرای شروع از منوی زیر استفاده کنید:"
+    text = "سلام! به ربات رزرو مشاوره روانشناسی خوش آمدید\nلطفاً از منوی زیر استفاده کنید:"
     if update.message:
         await update.message.reply_text(text, reply_markup=main_menu())
     else:
@@ -226,16 +230,17 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = query.from_user.id
 
     if data == "menu:new":
-        # اگر قبلاً اطلاعات داشته باشد، نمایش بده
         user_info = None
         if _cursor:
             rows = await db_execute("SELECT name, phone, age FROM appointments WHERE chat_id=%s", (chat_id,), fetch=True)
-            if rows:
+            if rows and rows[0]['name']:
                 user_info = rows[0]
 
-        if user_info and user_info['name']:
+        if user_info:
             await query.edit_message_text(
-                f"نام فعلی شما: {user_info['name']}\n\nاگر می‌خواهید تغییر دهید، نام جدید را بفرستید.\nدر غیر این صورت دوباره همین نام را ارسال کنید یا /cancel بزنید.",
+                f"نام فعلی: {user_info['name']}\n\n"
+                "اگر می‌خواهید تغییر دهید، نام جدید بفرستید.\n"
+                "در غیر این صورت همین نام را دوباره ارسال کنید یا /cancel بزنید.",
                 reply_markup=None
             )
         else:
@@ -246,8 +251,7 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         appt = None
         if _cursor:
             rows = await db_execute("SELECT * FROM appointments WHERE chat_id=%s", (chat_id,), fetch=True)
-            if rows:
-                appt = rows[0]
+            appt = rows[0] if rows else None
         else:
             appt = _memory_appointments.get(chat_id)
 
@@ -256,14 +260,14 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return ConversationHandler.END
 
         msg = (
-            f"اطلاعات رزرو شما:\n\n"
+            f"رزرو فعلی شما:\n\n"
             f"نام: {appt['name']}\n"
             f"شماره: {appt['phone']}\n"
             f"سن: {appt['age']}\n"
             f"روانشناس: {appt['psych']}\n"
             f"تاریخ: {appt['jalali_date']} ({appt['weekday']})\n"
             f"ساعت: {appt['time']}\n"
-            f"لینک جلسه: {appt['link']}"
+            f"لینک جلسه:\n{appt['link']}"
         )
         await query.edit_message_text(msg, reply_markup=main_menu())
         return ConversationHandler.END
@@ -276,7 +280,6 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("بازگشت", callback_data="menu:back")],
         ])
         await query.edit_message_text("کدام مورد را می‌خواهید ویرایش کنید؟", reply_markup=kb)
-        return ConversationHandler.END
 
     elif data == "menu:cancel":
         if _cursor:
@@ -301,7 +304,7 @@ async def edit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("نام جدید را وارد کنید:")
         return NAME
     elif action == "phone":
-        await query.edit_message_text("شماره تلفن جدید را وارد کنید:")
+        await query.edit_message_text("شماره تلفن جدید را وارد کنید (۱۰ یا ۱۱ رقم):")
         return PHONE
     elif action == "age":
         await query.edit_message_text("سن جدید را وارد کنید:")
@@ -320,7 +323,7 @@ async def name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not valid_phone(update.message.text):
-        await update.message.reply_text("شماره نامعتبر است. فقط عدد و ۱۰ یا ۱۱ رقم.")
+        await update.message.reply_text("شماره نامعتبر است. فقط عدد و ۱۰ یا ۱۱ رقم باشد.")
         return PHONE
     context.user_data['phone'] = re.sub(r"\D", "", normalize_digits(update.message.text))
     await update.message.reply_text("سن خود را به عدد وارد کنید:")
@@ -337,9 +340,12 @@ async def age(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def issue(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['issue'] = update.message.text.strip()
+    context.user_data['issue'] = update.message.text.strip() or "ذکر نشده"
     today = jdatetime.date.today()
-    await update.message.reply_text("روز مورد نظر را از تقویم انتخاب کنید:", reply_markup=render_month_keyboard(today.year, today.month))
+    await update.message.reply_text(
+        "روز مورد نظر را از تقویم انتخاب کنید:",
+        reply_markup=render_month_keyboard(today.year, today.month)
+    )
     return CALENDAR
 
 
@@ -365,12 +371,11 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         y, m, d = int(parts[2]), int(parts[3]), int(parts[4])
         jdate = jdatetime.date(y, m, d)
         jalali_str = f"{y}/{m:02d}/{d:02d}"
-        weekday = jdate.strftime("%A")  # شنبه، یکشنبه و...
+        weekday = jdate.strftime("%A")
 
         context.user_data['jalali_date'] = jalali_str
         context.user_data['weekday'] = weekday
 
-        # ساعت‌های آزاد
         available = AVAILABLE_TIMES.get(weekday, [])
         booked = []
 
@@ -385,11 +390,17 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         free_times = [t for t in available if t not in booked]
 
         if not free_times:
-            await query.edit_message_text("این روز ظرفیت ندارد. روز دیگری انتخاب کنید.", reply_markup=main_menu())
+            await query.edit_message_text(
+                f"متأسفانه در تاریخ {jalali_str} ({weekday}) هیچ ساعتی خالی نیست.\nروز دیگری انتخاب کنید.",
+                reply_markup=main_menu()
+            )
             return ConversationHandler.END
 
         kb = InlineKeyboardMarkup([[InlineKeyboardButton(t, callback_data=f"time:{t}")] for t in free_times])
-        await query.edit_message_text(f"تاریخ انتخابی: {jalali_str} ({weekday})\nساعت را انتخاب کنید:", reply_markup=kb)
+        await query.edit_message_text(
+            f"تاریخ انتخابی: {jalali_str} ({weekday})\n\nساعت مورد نظر را انتخاب کنید:",
+            reply_markup=kb
+        )
         return TIME
 
     elif action in ("prev", "next"):
@@ -403,7 +414,7 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             m -= 1
             if m < 1:
                 m = 12
-                y -=1
+                y -= 1
         await query.edit_message_reply_markup(reply_markup=render_month_keyboard(y, m))
         return CALENDAR
 
@@ -412,51 +423,61 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def time_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    time = query.data.split(":", 1)[1]
+    selected_time = query.data.split(":", 1)[1]
     chat_id = query.from_user.id
 
-    name = context.user_data.get('name')
-    phone = context.user_data.get('phone')
-    age = context.user_data.get('age')
-    issue = context.user_data.get('issue', '')
-    jalali_date = context.user_data.get('jalali_date')
-    weekday = context.user_data.get('weekday')
+    name = context.user_data['name']
+    phone = context.user_data['phone']
+    age = context.user_data['age']
+    issue = context.user_data.get('issue', 'ذکر نشده')
+    jalali_date = context.user_data['jalali_date']
+    weekday = context.user_data['weekday']
 
-    # حذف رزرو قبلی کاربر (فقط یک رزرو فعال)
+    # حذف رزرو قبلی (فقط یک رزرو فعال)
     if _cursor:
         await db_execute("DELETE FROM appointments WHERE chat_id=%s", (chat_id,))
         await db_execute("""
             INSERT INTO appointments 
             (chat_id, name, phone, age, issue, date, jalali_date, weekday, time, link, psych)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (chat_id, name, phone, age, issue, datetime.utcnow().isoformat(), jalali_date, weekday, time, MEET_LINK, "دکتر رضایی"))
+        """, (
+            chat_id, name, phone, age, issue,
+            datetime.utcnow().isoformat(),
+            jalali_date, weekday, selected_time, MEET_LINK, "دکتر رضایی"
+        ))
     else:
         _memory_appointments[chat_id] = {
             "name": name, "phone": phone, "age": age, "issue": issue,
-            "jalali_date": jalali_date, "weekday": weekday, "time": time,
-            "link": MEET_LINK, "psych": "دکتر رضایی"
+            "jalali_date": jalali_date, "weekday": weekday,
+            "time": selected_time, "link": MEET_LINK, "psych": "دکتر رضایی"
         }
 
     # اطلاع به ادمین
     try:
         await context.bot.send_message(
             ADMIN_CHAT_ID,
-            f"رزرو جدید!\n"
+            f"رزرو جدید!\n\n"
             f"نام: {name}\n"
-            f"شماره: {phone}\n}"
+            f"شماره: {phone}\n"
             f"سن: {age}\n"
+            f"موضوع: {issue}\n"
             f"تاریخ: {jalali_date} ({weekday})\n"
-            f"ساعت: {time}\n"
-            f"لینک: {MEET_LINK}"
+            f"ساعت: {selected_time}\n"
+            f"لینک: {MEET_LINK}\n\n"
+            f"آیدی: {chat_id}\n"
+            f"یوزرنیم: @{query.from_user.username or 'ندارد'}"
         )
     except Exception as e:
         print("خطا در ارسال پیام به ادمین:", e)
 
+    # پیام تأیید به کاربر
     await query.edit_message_text(
         f"رزرو با موفقیت ثبت شد!\n\n"
         f"تاریخ: {jalali_date} ({weekday})\n"
-        f"ساعت: {time}\n"
-        f"لینک جلسه: {MEET_LINK}",
+        f"ساعت: {selected_time}\n"
+        f"روانشناس: دکتر رضایی\n"
+        f"لینک جلسه:\n{MEET_LINK}\n\n"
+        f"لطفاً ۵ دقیقه قبل از شروع وارد لینک شوید.",
         reply_markup=main_menu()
     )
     return ConversationHandler.END
@@ -488,14 +509,14 @@ async def main():
             CALENDAR: [CallbackQueryHandler(calendar_handler, pattern="^cal:")],
             TIME: [CallbackQueryHandler(time_handler, pattern="^time:")],
         },
-        fallbacks=[CommandHandler("cancel", cancel), CallbackQueryHandler(cancel, pattern="^menu:back$")],
+        fallbacks=[CommandHandler("cancel", cancel)],
     )
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(edit_handler, pattern="^edit:"))
     app.add_handler(conv_handler)
 
-    print("بات در حال اجراست...")
+    print("ربات در حال اجراست...")
     await app.run_polling(drop_pending_updates=True)
 
 
