@@ -1,18 +1,42 @@
-# bot.py — نسخه نهایی، 100% استارت می‌خوره، همه چیز توی پنجره، بدون باگ
-import subprocess
+import asyncio
+import os
 import sys
 
-def fix_nest_forever():
-    try:
-        import nest_asyncio
-    except ImportError:
-        print("nest_asyncio نیست! دارم نصبش می‌کنم...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "nest_asyncio", "--quiet"])
-        print("nest_asyncio نصب شد!")
+# ====== فیکس ابدی nest_asyncio + RuntimeError ======
+try:
     import nest_asyncio
     nest_asyncio.apply()
-    print("nest_asyncio فعال شد!")
+    print("nest_asyncio اعمال شد")
+except:
+    print("nest_asyncio نبود، دارم نصب می‌کنم...")
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "nest_asyncio", "--quiet"])
+    import nest_asyncio
+    nest_asyncio.apply()
+    print("nest_asyncio نصب و اعمال شد!")
 
+# برای سرورهای لجباز (Railway, Render, Fly.io)
+if any(x in os.environ for x in ["RAILWAY_STATIC_URL", "RENDER", "FLY_APP_NAME"]):
+    asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
+# =================================================
+
+import re
+from urllib.parse import urlparse
+from datetime import datetime
+
+import jdatetime
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application, CommandHandler, CallbackQueryHandler,
+    ConversationHandler, MessageHandler, filters, ContextTypes
+)
+
+# بقیه کدت دقیقاً همون قبلی از اینجا شروع می‌شه...
+TOKEN = os.getenv("TOKEN")
+# ... و همه چیز دیگه
 fix_nest_forever()
 
 import os
